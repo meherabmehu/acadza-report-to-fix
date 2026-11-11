@@ -1,0 +1,9 @@
+# Security handoff — public assignment demo
+
+At the owner’s explicit request, all console login and MFA functionality was removed. This live demo is deliberately unauthenticated: anyone with access to the URL can read sample reports, run enabled AI requests, submit review decisions and alter the persisted workspace snapshot. Reviewer names are self-declared and audit entries are not proof of identity or expert approval. An attacker can forge actions or exhaust external model quota. Never use this configuration with private, sensitive, real student, or production data.
+
+The existing Supabase project was not deleted or altered; it is not used by this application. Existing host environment variables may remain configured but are ignored by the application. Student IDs are omitted from the public API, but report comments, review notes and authored content remain publicly visible. Older individual actor IDs and email fields are redacted in the API response, but this is not a comprehensive personal-data scrub: review all existing content before public sharing.
+
+PostgreSQL snapshot compare-and-swap rejects conflicting external writes; the app is still a single-instance design. Candidates, previews, cache and write serialization are process-local. No robust distributed rate limiting, backups, access control or recovery procedures are implemented. Same-origin browser POST checks, CSP and content guards reduce selected risks but do not restrict direct public API callers. These controls do not make the system safe for untrusted production use.
+
+This document is a self-review handoff, not an independent security audit. A production deployment requires authenticated, authorised individual accounts and appropriate MFA, session revocation, abuse controls, data classification, backups and independent review. Prior audit entries cannot establish verified faculty sign-off or subject accuracy.

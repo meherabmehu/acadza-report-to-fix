@@ -1,0 +1,16 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {chromium,firefox,webkit} from 'playwright';
+const engine=({chromium,firefox,webkit})[process.env.BROWSER_ENGINE||'chromium'];
+test('navigation and case rendering work at mobile, tablet and desktop sizes',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'nav-audit-')),port=32000+Math.floor(Math.random()*12000),base=`http://127.0.0.1:${port}`;
+ const child=spawn(process.execPath,['server.js'],{cwd:process.cwd(),env:{...process.env,PORT:String(port),NODE_ENV:'test',AUTO_APPLY_SAFE:'false',STATE_FILE:path.join(dir,'state.json')}});
+ t.after(()=>{child.kill();fs.rmSync(dir,{recursive:true,force:true})});await new Promise((resolve,reject)=>{let timer=setTimeout(()=>reject(Error('startup timeout')),8000);child.stdout.on('data',x=>{if(x.toString().includes('Faculty console listening')){clearTimeout(timer);resolve()}});child.once('exit',()=>{clearTimeout(timer);reject(Error('early exit'))})});
+ const browser=await engine.launch({headless:true,...(engine===chromium?{args:['--no-sandbox']}: {})});t.after(()=>browser.close());
+ for(const width of [375,768,1440]){
+  const page=await browser.newPage({viewport:{width,height:850}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
+  for(const [nav,heading] of [['Dashboard','A clearer way to review.'],['Report queue','Review queue'],['Question bank','Question bank'],['Student insights','Student insights'],['Audit history','Audit history'],['Settings','Settings']]){
+   await page.locator(`[data-nav="${({'Dashboard':'dashboard','Report queue':'queue','Question bank':'bank','Student insights':'insights','Audit history':'audit','Settings':'settings'})[nav]}"]`).first().click();await page.getByRole('heading',{name:heading}).waitFor();
+   const over=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);assert.equal(over,false,`${nav} overflows at ${width}px`);
+  }
+  await page.locator('[data-nav="bank"]').first().click();assert.equal(await page.locator('tr').filter({hasText:'0 reports'}).filter({hasText:'Not assessed'}).count(),4);await page.locator('[data-nav="audit"]').first().click();assert.equal(await page.locator('#audit-filter option[value="author_fix"]').count(),1);assert.equal(await page.locator('#audit-filter option[value="auto_apply"]').count(),1);await page.locator('[data-nav="queue"]').first().click();await page.locator('#status').selectOption('auto');assert.equal(await page.getByRole('button',{name:'View case'}).count(),2);await page.locator('#status').selectOption('all');await page.locator('#search').fill('68e872546e45ba37dcc16bc0');await page.getByRole('button',{name:'View case'}).click();assert.ok(await page.locator('mover').count()>0);await page.locator('[data-nav="queue"]').first().click();await page.locator('#search').fill('68dea619d0cda73d07e93aee');await page.getByRole('button',{name:'View case'}).click();assert.match(await page.locator('.evidence').first().innerText(),/same direction/);assert.equal(await page.getByRole('link',{name:/Published matching wheels question/}).count(),1);assert.deepEqual(errors,[]);await page.close();
+ }
+});

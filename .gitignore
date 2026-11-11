@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 state.json
 .DS_Store
+*.triage-checkpoint.json
+*.triage-checkpoint.json.tmp

@@ -1,0 +1,34 @@
+name: Seven-day availability check
+
+on:
+  workflow_dispatch:
+  schedule:
+    # UTC; half-hourly checks through 17 November. The job guards the year below.
+    - cron: '7,37 * 10-17 11 *'
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check deployed console
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" && "$(date -u +%Y)" != "2026" ]]; then
+            echo 'This monitor was only intended for November 2026.'
+            exit 0
+          fi
+          echo "Checked at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          # Free Render instances may take about a minute to wake.
+          curl --fail --silent --show-error --location --max-time 30 --retry 1 --retry-delay 5 \
+            https://acadza-review.onrender.com/api/health > health.json
+          python3 - <<'PY'
+          import json
+          with open('health.json') as f:
+              health = json.load(f)
+          if health != {'ok': True, 'storage': 'postgres'}:
+              raise SystemExit('Unexpected health response: PostgreSQL is not healthy')
+          print('PostgreSQL connection and workspace table are readable.')
+          PY
